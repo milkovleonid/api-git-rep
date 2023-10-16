@@ -1,21 +1,3 @@
-import neurokit2
-import sleepecg
-import wfdb.processing
-from nltk.util import ngrams
-import pywt
-import scipy
-import os
-from pylab import *
-from numpy import*
-import pandas as pd
-
-import matplotlib.pyplot as plt
-#from peakdetect import peakdetect
-from category_encoders.target_encoder import TargetEncoder
-from sklearn.model_selection import train_test_split
-
-from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_score
-from catboost import CatBoostClassifier
 def find_peaks(ecgsignal, peak): # нахождение пиков
     return wfdb.processing.correct_peaks(ecgsignal, rpeaks,
             search_radius=36, smooth_window_size=50, peak_dir=peak)
