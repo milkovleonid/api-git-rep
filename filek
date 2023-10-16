@@ -1,6 +1,318 @@
-def capitalize(String):
-    return String.title()
-capitalize("shop") # [Shop]
-capitalize("python programming") # [Python Programming]
-capitalize("how are you!") # [How Are You!]
+import neurokit2
+import sleepecg
+import wfdb.processing
+from nltk.util import ngrams
+
+from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_score
+from catboost import CatBoostClassifier
+def find_peaks(ecgsignal, peak): # нахождение пиков
+    return wfdb.processing.correct_peaks(ecgsignal, rpeaks,
+            search_radius=36, smooth_window_size=50, peak_dir=peak)
+def get_cycle(ecgsignal, rpeaks): # разбиение ЭКГ на циклы
+    ecgsignal_split = []
+    cycle = []
+    rpeaks = rpeaks[::-1]
+    f = True #флаг конца массива с пиками
+    f1 = True #флаг вхождения первого пика
+    for i in range(len(ecgsignal)):
+        if f and i == rpeaks[-1]:
+            if f1:
+                f1 = False
+                cycle = []
+            else:
+                ecgsignal_split.append(cycle)
+                cycle = []
+            rpeaks = rpeaks[:-1]
+            if f and len(rpeaks) == 0:
+                f = False
+        cycle.append(ecgsignal[i])
+    return ecgsignal_split
+def sign(x): # возвращает знак числа
+   return 1 if x > 0 else -1
+def RTL(ecgsignal_split): # получение списка приращения амплитуд R, интервалов T, углов L
+    sp = [[(i[0] - min(i[:10])), len(i), ((i[0] - min(i[:10]))/len(i))] for i in ecgsignal_split]
+    s = []
+    for i in range(len(sp) - 1):
+        R = sp[i + 1][0] - sp[i][0]
+        T = sp[i + 1][1] - sp[i][1]
+        L = sp[i + 1][2] - sp[i][2]
+        s.append([R, T, L])
+    return s
+def letters(data): # кодирование цикла по В.М. Успенскому
+  if data[0] == 1:
+    if data[1] == -1:
+      return 'C'
+    else:
+      if data[2] == -1:
+        return 'E'
+      return 'A'
+  else:
+    if data[1] == 1:
+      return 'D'
+    else:
+      if data[2] == 1:
+        return 'B'
+      return 'F'
+def encoding(ecgsignal_split): # кодирование циклов в строку по В.М. Успенскому
+    s = [[sign(i) for i in k] for k in RTL(ecgsignal_split)]
+    stroka = ''
+    for i in s:
+        stroka += letters(i)
+    return stroka
+def counter_and_sort(arr): # считает и сортирует н-граммы
+  quantity = {}
+  for i in arr:
+    if i in quantity:
+      quantity[i] += 1
+    else:
+      quantity[i] = 1
+  quantity = pd.Series(list(quantity.values()), index=list(quantity.keys())).sort_values(ascending=False)
+  return quantity
+def func(ng):  # возвращает список количества н-грамм, относящихся к каждой категории
+    # н-граммы, встречающиеся только в этой категории
+    ng_healthy = sum(list(map(lambda x: 1 if x in only_healthy else 0, ng))) 
+    ng_sick = sum(list(map(lambda x: 1 if x in only_sick else 0, ng)))
+    
+    ng_septal_0 = sum(list(map(lambda x: 1 if x in only_septal_0 else 0, ng)))
+    ng_septal_1 = sum(list(map(lambda x: 1 if x in only_septal_1 else 0, ng)))
+    
+    ng_front_0 = sum(list(map(lambda x: 1 if x in only_front_0 else 0, ng)))
+    ng_front_1 = sum(list(map(lambda x: 1 if x in only_front_1 else 0, ng)))
+    
+    ng_side_0 = sum(list(map(lambda x: 1 if x in only_side_0 else 0, ng)))
+    ng_side_1 = sum(list(map(lambda x: 1 if x in only_side_1 else 0, ng)))
+    
+    ng_front_side_0 = sum(list(map(lambda x: 1 if x in only_front_side_0 else 0, ng)))
+    ng_front_side_1 = sum(list(map(lambda x: 1 if x in only_front_side_1 else 0, ng)))
+    
+    ng_front_septal_0 = sum(list(map(lambda x: 1 if x in only_front_septal_0 else 0, ng)))
+    ng_front_septal_1 = sum(list(map(lambda x: 1 if x in only_front_septal_1 else 0, ng)))
+    
+    ng_lower_0 = sum(list(map(lambda x: 1 if x in only_lower_0 else 0, ng)))
+    ng_lower_1 = sum(list(map(lambda x: 1 if x in only_lower_1 else 0, ng)))
+    
+    # н-граммы, которые чаще всего встречаются в этой и не встречаются в противоположной категории
+    ng_popular_healthy = sum(list(map(lambda x: 1 if x in popular_healthy_only else 0, ng)))
+    ng_popular_sick = sum(list(map(lambda x: 1 if x in popular_sick_only else 0, ng)))
+    
+    ng_popular_septal_0 = sum(list(map(lambda x: 1 if x in popular_septal_0_only else 0, ng)))
+    ng_popular_septal_1 = sum(list(map(lambda x: 1 if x in popular_septal_1_only else 0, ng)))
+    
+    ng_popular_front_0 = sum(list(map(lambda x: 1 if x in popular_front_0_only else 0, ng)))
+    ng_popular_front_1 = sum(list(map(lambda x: 1 if x in popular_front_1_only else 0, ng)))
+    
+    ng_popular_side_0 = sum(list(map(lambda x: 1 if x in popular_side_0_only else 0, ng)))
+    ng_popular_side_1 = sum(list(map(lambda x: 1 if x in popular_side_1_only else 0, ng)))
+    
+    ng_popular_front_side_0 = sum(list(map(lambda x: 1 if x in popular_front_side_0_only else 0, ng)))
+    ng_popular_front_side_1 = sum(list(map(lambda x: 1 if x in popular_front_side_1_only else 0, ng)))
+    
+    ng_popular_front_septal_0 = sum(list(map(lambda x: 1 if x in popular_front_septal_0_only else 0, ng)))
+    ng_popular_front_septal_1 = sum(list(map(lambda x: 1 if x in popular_front_septal_1_only else 0, ng)))
+    
+    ng_popular_lower_0 = sum(list(map(lambda x: 1 if x in popular_lower_0_only else 0, ng)))
+    ng_popular_lower_1 = sum(list(map(lambda x: 1 if x in popular_lower_1_only else 0, ng)))
+    
+    return array([[ng_healthy, ng_popular_healthy, ng_sick, ng_popular_sick],
+                  [ng_septal_0, ng_popular_septal_0, ng_septal_1, ng_popular_septal_1],
+                  [ng_front_0, ng_popular_front_0, ng_front_1, ng_popular_front_1],
+                  [ng_side_0, ng_popular_side_0, ng_side_1, ng_popular_side_1],
+                  [ng_front_side_0, ng_popular_front_side_0, ng_front_side_1, ng_popular_front_side_1],
+                  [ng_front_septal_0, ng_popular_front_septal_0, ng_front_septal_1, ng_popular_front_septal_1],
+                  [ng_lower_0, ng_popular_lower_0, ng_lower_1, ng_popular_lower_1]])
+def sp_n_gramms(ngramma):  # получение н-грамм
+    sp = []
+    for i in ngramma:
+        n = list(map(lambda x: ''.join(list(x)), list(ngrams(list(i), 4))))
+        for k in n:
+            sp.append(k)
+    return sp
+ECG_data_array_train = np.array(ECG_data_train)
+R_Peaks_train = []
+ecg_ids_train = []
+encoding_ecgs_train = []
+for ecgsignal in ECG_data_array_train: # кодирование таблицы  с графиками
+    ecg_id = ecgsignal[0]
+    ecgsignal = ecgsignal[1:]
+
+    _, results = neurokit2.ecg_peaks(ecgsignal, sampling_rate=100)
+    rpeaks = results["ECG_R_Peaks"]
+    rpeaks = sleepecg.detect_heartbeats(ecgsignal, fs=100)
+    rpeaks = wfdb.processing.xqrs_detect(ecgsignal, fs=100, verbose=False)
+
+    rpeaks = find_peaks(ecgsignal, 'up') # получение R-пиков
+    R_Peaks_train.append(rpeaks)
+
+    ecgsignal_split = get_cycle(ecgsignal, rpeaks) # получение циклов экг
+    encoding_ecg = encoding(ecgsignal_split)  # кодирование циклов
+
+    ecg_ids_train.append(ecg_id)
+    encoding_ecgs_train.append(encoding_ecg)
+encoding_ecg_train = pd.DataFrame(columns=['encoding_ecg', 'ecg_id', 'перегородочный', 'передний', 'боковой',
+                                           'передне-боковой','передне-перегородочный', 'нижний', 'норма'])
+encoding_ecg_train.encoding_ecg = encoding_ecgs_train
+encoding_ecg_train.ecg_id = ecg_ids_train
+encoding_ecg_train = encoding_ecg_train.sort_values(by='ecg_id')
+encoding_ecg_train[['перегородочный', 'передний', 'боковой',
+                    'передне-боковой','передне-перегородочный', 'нижний', 'норма']] = array(myocard_train)
+healthy = encoding_ecg_train[encoding_ecg_train['норма'] == 1].encoding_ecg  # закодированные кардиограммы по категориям
+sick = encoding_ecg_train[encoding_ecg_train['норма'] == 0].encoding_ecg
+
+septal_0 = encoding_ecg_train[encoding_ecg_train['перегородочный'] == 0].encoding_ecg
+septal_1 = encoding_ecg_train[encoding_ecg_train['перегородочный'] == 1].encoding_ecg
+
+front_0 = encoding_ecg_train[encoding_ecg_train['передний'] == 0].encoding_ecg
+front_1 = encoding_ecg_train[encoding_ecg_train['передний'] == 1].encoding_ecg
+
+side_0 = encoding_ecg_train[encoding_ecg_train['боковой'] == 0].encoding_ecg
+side_1 = encoding_ecg_train[encoding_ecg_train['боковой'] == 1].encoding_ecg
+
+front_side_0 = encoding_ecg_train[encoding_ecg_train['передне-боковой'] == 0].encoding_ecg
+front_side_1 = encoding_ecg_train[encoding_ecg_train['передне-боковой'] == 1].encoding_ecg
+
+front_septal_0 = encoding_ecg_train[encoding_ecg_train['передне-перегородочный'] == 0].encoding_ecg
+front_septal_1 = encoding_ecg_train[encoding_ecg_train['передне-перегородочный'] == 1].encoding_ecg
+
+lower_0 = encoding_ecg_train[encoding_ecg_train['нижний'] == 0].encoding_ecg
+lower_1 = encoding_ecg_train[encoding_ecg_train['нижний'] == 1].encoding_ecg
+sp_healthy = sp_n_gramms(healthy)  # списки н-грамм
+sp_sick = sp_n_gramms(sick)
+
+sp_septal_0 = sp_n_gramms(septal_0)
+sp_septal_1 = sp_n_gramms(septal_1)
+
+sp_front_0 = sp_n_gramms(front_0)
+sp_front_1 = sp_n_gramms(front_1)
+
+sp_side_0 = sp_n_gramms(side_0)
+sp_side_1 = sp_n_gramms(side_1)
+
+sp_front_side_0 = sp_n_gramms(front_side_0)
+sp_front_side_1 = sp_n_gramms(front_side_1)
+
+sp_front_septal_0 = sp_n_gramms(front_septal_0)
+sp_front_septal_1 = sp_n_gramms(front_septal_1)
+
+sp_lower_0 = sp_n_gramms(lower_0)
+sp_lower_1 = sp_n_gramms(lower_1)
+q_healthy = counter_and_sort(sp_healthy)  # отсортированные н-граммы
+q_sick = counter_and_sort(sp_sick)
+
+q_septal_0 = counter_and_sort(sp_septal_0)
+q_septal_1 = counter_and_sort(sp_septal_1)
+
+q_front_0 = counter_and_sort(sp_front_0)
+q_front_1 = counter_and_sort(sp_front_1)
+
+q_side_0 = counter_and_sort(sp_side_0)
+q_side_1 = counter_and_sort(sp_side_1)
+
+q_front_side_0 = counter_and_sort(sp_front_side_0)
+q_front_side_1 = counter_and_sort(sp_front_side_1)
+
+q_front_septal_0 = counter_and_sort(sp_front_septal_0)
+q_front_septal_1 = counter_and_sort(sp_front_septal_1)
+
+q_lower_0 = counter_and_sort(sp_lower_0)
+q_lower_1 = counter_and_sort(sp_lower_1)
+
+only_sick = list(set(q_sick.index) - set(q_healthy.index))  # н-граммы, встречающиеся только в этой категории 
+only_healthy = list(set(q_healthy.index) - set(q_sick.index))
+
+only_septal_0 = list(set(q_septal_0.index) - set(q_septal_1.index))
+only_septal_1 = list(set(q_septal_1.index) - set(q_septal_0.index))
+
+only_front_0 = list(set(q_front_0.index) - set(q_front_1.index))
+only_front_1 = list(set(q_front_1.index) - set(q_front_0.index))
+
+only_side_0 = list(set(q_side_0.index) - set(q_side_1.index))
+only_side_1 = list(set(q_side_1.index) - set(q_side_0.index))
+
+only_front_side_0 = list(set(q_front_side_0.index) - set(q_front_side_1.index))
+only_front_side_1 = list(set(q_front_side_1.index) - set(q_front_side_0.index))
+
+only_front_septal_0 = list(set(q_front_septal_0.index) - set(q_front_septal_1.index))
+only_front_septal_1 = list(set(q_front_septal_1.index) - set(q_front_septal_0.index))
+
+only_lower_0 = list(set(q_lower_0.index) - set(q_lower_1.index))
+only_lower_1 = list(set(q_lower_1.index) - set(q_lower_0.index))
+popular_sick = q_sick.iloc[:len(q_sick) // 2]  # н-граммы, чаще всего встречающиеся в этой категории
+popular_healthy = q_healthy.iloc[:len(q_healthy) // 2]
+
+popular_septal_0 = q_septal_0.iloc[:len(q_septal_0) // 2]
+popular_septal_1 = q_septal_1.iloc[:len(q_septal_1) // 2]
+
+popular_front_0 = q_front_0.iloc[:len(q_front_0) // 2]
+popular_front_1 = q_front_1.iloc[:len(q_front_1) // 2]
+
+popular_side_0 = q_side_0.iloc[:len(q_side_0) // 2]
+popular_side_1 = q_side_1.iloc[:len(q_side_1) // 2]
+
+popular_front_side_0 = q_front_side_0.iloc[:len(q_front_side_0) // 2]
+popular_front_side_1 = q_front_side_1.iloc[:len(q_front_side_1) // 2]
+
+popular_front_septal_0 = q_front_septal_0.iloc[:len(q_front_septal_0) // 2]
+popular_front_septal_1 = q_front_septal_1.iloc[:len(q_front_septal_1) // 2]
+
+popular_lower_0 = q_lower_0.iloc[:len(q_lower_0) // 2]
+popular_lower_1 = q_lower_1.iloc[:len(q_lower_1) // 2]
+# н-граммы, которые чаще всего встречаются в этой и не встречаются в противоположной категории
+popular_sick_only = list(set(popular_sick.index) - set(popular_healthy.index))
+popular_healthy_only = list(set(popular_healthy.index) - set(popular_sick.index))
+
+popular_septal_0_only = list(set(popular_septal_0.index) - set(popular_septal_1.index))
+popular_septal_1_only = list(set(popular_septal_1.index) - set(popular_septal_0.index))
+
+popular_front_0_only = list(set(popular_front_0.index) - set(popular_front_1.index))
+popular_front_1_only = list(set(popular_front_1.index) - set(popular_front_0.index))
+
+popular_side_0_only = list(set(popular_side_0.index) - set(popular_side_1.index))
+popular_side_1_only = list(set(popular_side_1.index) - set(popular_side_0.index))
+
+popular_front_side_0_only = list(set(popular_front_side_0.index) - set(popular_front_side_1.index))
+popular_front_side_1_only = list(set(popular_front_side_1.index) - set(popular_front_side_0.index))
+
+popular_front_septal_0_only = list(set(popular_front_septal_0.index) - set(popular_front_septal_1.index))
+popular_front_septal_1_only = list(set(popular_front_septal_1.index) - set(popular_front_septal_0.index))
+
+popular_lower_0_only = list(set(popular_lower_0.index) - set(popular_lower_1.index))
+popular_lower_1_only = list(set(popular_lower_1.index) - set(popular_lower_0.index))
+ngramms_ecgs_train = []  # список н-грамм в кардиограммах
+for ecg in array(encoding_ecg_train):
+    ngramms_ecg = set()
+    n = list(map(lambda x: ''.join(list(x)), list(ngrams(list(ecg[0]), 5))))
+    for k in n:
+        ngramms_ecg.add(k)
+    ngramms_ecgs_train.append(list(ngramms_ecg))
+df_healthy = pd.DataFrame([func(ng)[0] for ng in ngramms_ecgs_train])
+df_septal = pd.DataFrame([func(ng)[1] for ng in ngramms_ecgs_train])
+df_front = pd.DataFrame([func(ng)[2] for ng in ngramms_ecgs_train])
+df_side = pd.DataFrame([func(ng)[3] for ng in ngramms_ecgs_train])
+df_front_side = pd.DataFrame([func(ng)[4] for ng in ngramms_ecgs_train])
+df_front_septal = pd.DataFrame([func(ng)[5] for ng in ngramms_ecgs_train])
+df_lower = pd.DataFrame([func(ng)[6] for ng in ngramms_ecgs_train])
+
+X_train_healthy, X_test_healthy, y_train_healthy, y_test_healthy = train_test_split(df_healthy,
+                                                                    myocard_train['норма'], random_state=0, test_size=0.8)
+
+X_train_septal, X_test_septal, y_train_septal, y_test_septal = train_test_split(df_septal, myocard_train['перегородочный'],
+                                                                                random_state=0, test_size=0.35)
+
+X_train_front, X_test_front, y_train_front, y_test_front = train_test_split(df_front, myocard_train['передний'],
+                                                                            random_state=0, test_size=0.7)
+
+X_train_side, X_test_side, y_train_side, y_test_side = train_test_split(df_side, myocard_train['боковой'], random_state=0)
+
+X_train_front_side, X_test_front_side, y_train_front_side, y_test_front_side = train_test_split(df_front_side,
+                                                                    myocard_train['передне-боковой'], random_state=0,
+                                                                                               test_size=0.1)
+
+X_train_front_septal, X_test_front_septal, y_train_front_septal, y_test_front_septal = train_test_split(df_front_septal,
+                                                                    myocard_train['передне-перегородочный'], random_state=0,
+                                                                                                       test_size=0.2)
+
+X_train_lower, X_test_lower, y_train_lower, y_test_lower = train_test_split(df_lower, myocard_train['нижний'],
+                                                                            random_state=0, test_size=0.45)
+cat_n_gramms_healthy = CatBoostClassifier()
+cat_n_gramms_healthy.fit(X_train_healthy, y_train_healthy)
 
