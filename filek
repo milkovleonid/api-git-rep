@@ -315,4 +315,5 @@ X_train_lower, X_test_lower, y_train_lower, y_test_lower = train_test_split(df_l
                                                                             random_state=0, test_size=0.45)
 cat_n_gramms_healthy = CatBoostClassifier()
 cat_n_gramms_healthy.fit(X_train_healthy, y_train_healthy)
-
+print(f1_score(y_test_healthy, cat_n_gramms_healthy.predict(X_test_healthy), average='macro'))
+print(f1_score(y_train_healthy, cat_n_gramms_healthy.predict(X_train_healthy), average='macro'))
