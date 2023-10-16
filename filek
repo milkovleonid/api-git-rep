@@ -1,12 +1,12 @@
-def find_peaks(ecgsignal, peak): # нахождение пиков
+def find_peaks(ecgsignal, peak):
     return wfdb.processing.correct_peaks(ecgsignal, rpeaks,
             search_radius=36, smooth_window_size=50, peak_dir=peak)
-def get_cycle(ecgsignal, rpeaks): # разбиение ЭКГ на циклы
+def get_cycle(ecgsignal, rpeaks):
     ecgsignal_split = []
     cycle = []
     rpeaks = rpeaks[::-1]
-    f = True #флаг конца массива с пиками
-    f1 = True #флаг вхождения первого пика
+    f = True
+    f1 = True 
     for i in range(len(ecgsignal)):
         if f and i == rpeaks[-1]:
             if f1:
@@ -22,7 +22,7 @@ def get_cycle(ecgsignal, rpeaks): # разбиение ЭКГ на циклы
     return ecgsignal_split
 def sign(x): # возвращает знак числа
    return 1 if x > 0 else -1
-def RTL(ecgsignal_split): # получение списка приращения амплитуд R, интервалов T, углов L
+def RTL(ecgsignal_split):
     sp = [[(i[0] - min(i[:10])), len(i), ((i[0] - min(i[:10]))/len(i))] for i in ecgsignal_split]
     s = []
     for i in range(len(sp) - 1):
@@ -31,7 +31,7 @@ def RTL(ecgsignal_split): # получение списка приращения
         L = sp[i + 1][2] - sp[i][2]
         s.append([R, T, L])
     return s
-def letters(data): # кодирование цикла по В.М. Успенскому
+def letters(data):
   if data[0] == 1:
     if data[1] == -1:
       return 'C'
@@ -46,13 +46,13 @@ def letters(data): # кодирование цикла по В.М. Успенс�
       if data[2] == 1:
         return 'B'
       return 'F'
-def encoding(ecgsignal_split): # кодирование циклов в строку по В.М. Успенскому
+def encoding(ecgsignal_split): 
     s = [[sign(i) for i in k] for k in RTL(ecgsignal_split)]
     stroka = ''
     for i in s:
         stroka += letters(i)
     return stroka
-def counter_and_sort(arr): # считает и сортирует н-граммы
+def counter_and_sort(arr):
   quantity = {}
   for i in arr:
     if i in quantity:
@@ -61,8 +61,7 @@ def counter_and_sort(arr): # считает и сортирует н-грамм�
       quantity[i] = 1
   quantity = pd.Series(list(quantity.values()), index=list(quantity.keys())).sort_values(ascending=False)
   return quantity
-def func(ng):  # возвращает список количества н-грамм, относящихся к каждой категории
-    # н-граммы, встречающиеся только в этой категории
+def func(ng): 
     ng_healthy = sum(list(map(lambda x: 1 if x in only_healthy else 0, ng))) 
     ng_sick = sum(list(map(lambda x: 1 if x in only_sick else 0, ng)))
     
@@ -84,7 +83,6 @@ def func(ng):  # возвращает список количества н-гр�
     ng_lower_0 = sum(list(map(lambda x: 1 if x in only_lower_0 else 0, ng)))
     ng_lower_1 = sum(list(map(lambda x: 1 if x in only_lower_1 else 0, ng)))
     
-    # н-граммы, которые чаще всего встречаются в этой и не встречаются в противоположной категории
     ng_popular_healthy = sum(list(map(lambda x: 1 if x in popular_healthy_only else 0, ng)))
     ng_popular_sick = sum(list(map(lambda x: 1 if x in popular_sick_only else 0, ng)))
     
@@ -113,7 +111,7 @@ def func(ng):  # возвращает список количества н-гр�
                   [ng_front_side_0, ng_popular_front_side_0, ng_front_side_1, ng_popular_front_side_1],
                   [ng_front_septal_0, ng_popular_front_septal_0, ng_front_septal_1, ng_popular_front_septal_1],
                   [ng_lower_0, ng_popular_lower_0, ng_lower_1, ng_popular_lower_1]])
-def sp_n_gramms(ngramma):  # получение н-грамм
+def sp_n_gramms(ngramma):
     sp = []
     for i in ngramma:
         n = list(map(lambda x: ''.join(list(x)), list(ngrams(list(i), 4))))
@@ -124,7 +122,7 @@ ECG_data_array_train = np.array(ECG_data_train)
 R_Peaks_train = []
 ecg_ids_train = []
 encoding_ecgs_train = []
-for ecgsignal in ECG_data_array_train: # кодирование таблицы  с графиками
+for ecgsignal in ECG_data_array_train: 
     ecg_id = ecgsignal[0]
     ecgsignal = ecgsignal[1:]
 
@@ -133,11 +131,11 @@ for ecgsignal in ECG_data_array_train: # кодирование таблицы  
     rpeaks = sleepecg.detect_heartbeats(ecgsignal, fs=100)
     rpeaks = wfdb.processing.xqrs_detect(ecgsignal, fs=100, verbose=False)
 
-    rpeaks = find_peaks(ecgsignal, 'up') # получение R-пиков
+    rpeaks = find_peaks(ecgsignal, 'up')
     R_Peaks_train.append(rpeaks)
 
-    ecgsignal_split = get_cycle(ecgsignal, rpeaks) # получение циклов экг
-    encoding_ecg = encoding(ecgsignal_split)  # кодирование циклов
+    ecgsignal_split = get_cycle(ecgsignal, rpeaks)
+    encoding_ecg = encoding(ecgsignal_split)  
 
     ecg_ids_train.append(ecg_id)
     encoding_ecgs_train.append(encoding_ecg)
@@ -148,7 +146,7 @@ encoding_ecg_train.ecg_id = ecg_ids_train
 encoding_ecg_train = encoding_ecg_train.sort_values(by='ecg_id')
 encoding_ecg_train[['перегородочный', 'передний', 'боковой',
                     'передне-боковой','передне-перегородочный', 'нижний', 'норма']] = array(myocard_train)
-healthy = encoding_ecg_train[encoding_ecg_train['норма'] == 1].encoding_ecg  # закодированные кардиограммы по категориям
+healthy = encoding_ecg_train[encoding_ecg_train['норма'] == 1].encoding_ecg 
 sick = encoding_ecg_train[encoding_ecg_train['норма'] == 0].encoding_ecg
 
 septal_0 = encoding_ecg_train[encoding_ecg_train['перегородочный'] == 0].encoding_ecg
@@ -188,7 +186,7 @@ sp_front_septal_1 = sp_n_gramms(front_septal_1)
 
 sp_lower_0 = sp_n_gramms(lower_0)
 sp_lower_1 = sp_n_gramms(lower_1)
-q_healthy = counter_and_sort(sp_healthy)  # отсортированные н-граммы
+q_healthy = counter_and_sort(sp_healthy) 
 q_sick = counter_and_sort(sp_sick)
 
 q_septal_0 = counter_and_sort(sp_septal_0)
@@ -209,7 +207,7 @@ q_front_septal_1 = counter_and_sort(sp_front_septal_1)
 q_lower_0 = counter_and_sort(sp_lower_0)
 q_lower_1 = counter_and_sort(sp_lower_1)
 
-only_sick = list(set(q_sick.index) - set(q_healthy.index))  # н-граммы, встречающиеся только в этой категории 
+only_sick = list(set(q_sick.index) - set(q_healthy.index))  
 only_healthy = list(set(q_healthy.index) - set(q_sick.index))
 
 only_septal_0 = list(set(q_septal_0.index) - set(q_septal_1.index))
@@ -229,7 +227,7 @@ only_front_septal_1 = list(set(q_front_septal_1.index) - set(q_front_septal_0.in
 
 only_lower_0 = list(set(q_lower_0.index) - set(q_lower_1.index))
 only_lower_1 = list(set(q_lower_1.index) - set(q_lower_0.index))
-popular_sick = q_sick.iloc[:len(q_sick) // 2]  # н-граммы, чаще всего встречающиеся в этой категории
+popular_sick = q_sick.iloc[:len(q_sick) // 2] 
 popular_healthy = q_healthy.iloc[:len(q_healthy) // 2]
 
 popular_septal_0 = q_septal_0.iloc[:len(q_septal_0) // 2]
@@ -249,7 +247,7 @@ popular_front_septal_1 = q_front_septal_1.iloc[:len(q_front_septal_1) // 2]
 
 popular_lower_0 = q_lower_0.iloc[:len(q_lower_0) // 2]
 popular_lower_1 = q_lower_1.iloc[:len(q_lower_1) // 2]
-# н-граммы, которые чаще всего встречаются в этой и не встречаются в противоположной категории
+
 popular_sick_only = list(set(popular_sick.index) - set(popular_healthy.index))
 popular_healthy_only = list(set(popular_healthy.index) - set(popular_sick.index))
 
@@ -270,7 +268,7 @@ popular_front_septal_1_only = list(set(popular_front_septal_1.index) - set(popul
 
 popular_lower_0_only = list(set(popular_lower_0.index) - set(popular_lower_1.index))
 popular_lower_1_only = list(set(popular_lower_1.index) - set(popular_lower_0.index))
-ngramms_ecgs_train = []  # список н-грамм в кардиограммах
+ngramms_ecgs_train = [] 
 for ecg in array(encoding_ecg_train):
     ngramms_ecg = set()
     n = list(map(lambda x: ''.join(list(x)), list(ngrams(list(ecg[0]), 5))))
