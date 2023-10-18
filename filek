@@ -27,6 +27,7 @@ def into_one_table(keys, directory): # преобразование график
         table = np.vstack([table, row])
     table = pd.DataFrame(table)
     return table
+%%time
 target = pd.Series(list(map(lambda x: x[:-4], os.listdir('train')[:-3])))
 ECG_data = into_one_table(target, 'train/') # таблица с графиками
 
