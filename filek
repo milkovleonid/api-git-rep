@@ -27,17 +27,16 @@ def into_one_table(keys, directory): # преобразование график
         table = np.vstack([table, row])
     table = pd.DataFrame(table)
     return table
-%%time
 target = pd.Series(list(map(lambda x: x[:-4], os.listdir('train')[:-3])))
 ECG_data = into_one_table(target, 'train/') # таблица с графиками
 
 ECG_data[0] = ECG_data[0].astype('int')
 ECG_data = ECG_data.rename(columns={0: 'record_name'})
 ECG_data = ECG_data.sort_values(by=['record_name'], ascending=True)
-df = pd.read_csv('train/train_meta.csv')
+df = pd.read_csv('train_meta.csv')
 df.record_name = list(map(lambda x: int(x.strip('_hr')), df.record_name))
 ECG_data = ECG_data.merge(df, on='record_name', how='left')
-gts = pd.read_csv('train/train_gts_final.csv')
+gts = pd.read_csv('train_gts_final.csv')
 gts.record_name = list(map(lambda x: int(x.strip('_hr')), gts.record_name))
 ECG_data = ECG_data.merge(gts, on='record_name', how='left')
 gts = ECG_data[['перегородочный', 'передний', 'боковой', 'передне-боковой', 'передне-перегородочный', 'нижний', 'норма']]
