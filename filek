@@ -400,7 +400,7 @@ ECG_data_test = into_one_table(target, test/') # таблица с график�
 ECG_data_test[0] = ECG_data_test[0].astype('int')
 ECG_data_test = ECG_data_test.rename(columns={0: 'ecg_id'})
 ECG_data_test = ECG_data_test.sort_values(by=['ecg_id'], ascending=True)
-df_test = pd.read_csv(os.path.dirname(os.path.abspath(__file__)) + 'test/test_meta.csv')
+df_test = pd.read_csv(os.path.dirname(os.path.abspath(__file__)) + '/test/test_meta.csv')
 df_test.record_name = list(map(lambda x: int(x.strip('_hr')), df_test.record_name))
 df_test.rename(columns = {'record_name':'ecg_id'}, inplace = True)
 ECG_data_test = ECG_data_test.merge(df_test, on='ecg_id', how='left')
