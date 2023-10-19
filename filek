@@ -395,125 +395,63 @@ cat_n_gramms_front_septal = CatBoostClassifier()
 cat_n_gramms_front_septal.fit(X_train_front_septal, y_train_front_septal, verbose=False)
 cat_n_gramms_lower = CatBoostClassifier()
 cat_n_gramms_lower.fit(X_train_lower, y_train_lower, verbose=False)
+def test_n():
+    target = pd.Series(list(map(lambda x: x[:-4], os.listdir('test')[:-1])))
+    ECG_data_test = into_one_table(target, 'test/') # таблица с графиками
+    ECG_data_test[0] = ECG_data_test[0].astype('int')
+    ECG_data_test = ECG_data_test.rename(columns={0: 'ecg_id'})
+    ECG_data_test = ECG_data_test.sort_values(by=['ecg_id'], ascending=True)
+    df_test = pd.read_csv('test/test_meta.csv')
+    df_test.record_name = list(map(lambda x: int(x.strip('_hr')), df_test.record_name))
+    df_test.rename(columns = {'record_name':'ecg_id'}, inplace = True)
+    ECG_data_test = ECG_data_test.merge(df_test, on='ecg_id', how='left')
+    df_test = ECG_data_test.iloc[:, -5:]
+    ECG_data_test = ECG_data_test.iloc[:, :-5]
+    ECG_data_test_array = np.array(ECG_data_test)
+    R_Peaks_test = []
+    ecg_ids_test = []
+    encoding_ecgs_test = []
+    for ecgsignal in ECG_data_test_array: # кодирование таблицы  с графиками
+        ecg_id = ecgsignal[0]
+        ecgsignal = ecgsignal[1:]
 
-target = pd.Series(list(map(lambda x: x[:-4], os.listdir('test')[:-1])))
-ECG_data_test = into_one_table(target, 'test/') # таблица с графиками
-ECG_data_test[0] = ECG_data_test[0].astype('int')
-ECG_data_test = ECG_data_test.rename(columns={0: 'ecg_id'})
-ECG_data_test = ECG_data_test.sort_values(by=['ecg_id'], ascending=True)
-df_test = pd.read_csv('test/test_meta.csv')
-df_test.record_name = list(map(lambda x: int(x.strip('_hr')), df_test.record_name))
-df_test.rename(columns = {'record_name':'ecg_id'}, inplace = True)
-ECG_data_test = ECG_data_test.merge(df_test, on='ecg_id', how='left')
-df_test = ECG_data_test.iloc[:, -5:]
-ECG_data_test = ECG_data_test.iloc[:, :-5]
-ECG_data_test_array = np.array(ECG_data_test)
-R_Peaks_test = []
-ecg_ids_test = []
-encoding_ecgs_test = []
-for ecgsignal in ECG_data_test_array: # кодирование таблицы  с графиками
-    ecg_id = ecgsignal[0]
-    ecgsignal = ecgsignal[1:]
+        _, results = neurokit2.ecg_peaks(ecgsignal, sampling_rate=100)
+        rpeaks = results["ECG_R_Peaks"]
+        rpeaks = sleepecg.detect_heartbeats(ecgsignal, fs=100)
+        rpeaks = wfdb.processing.xqrs_detect(ecgsignal, fs=100, verbose=False)
 
-    _, results = neurokit2.ecg_peaks(ecgsignal, sampling_rate=100)
-    rpeaks = results["ECG_R_Peaks"]
-    rpeaks = sleepecg.detect_heartbeats(ecgsignal, fs=100)
-    rpeaks = wfdb.processing.xqrs_detect(ecgsignal, fs=100, verbose=False)
+        rpeaks = find_peaks(ecgsignal, 'up') # получение R-пиков
+        R_Peaks_test.append(rpeaks)
 
-    rpeaks = find_peaks(ecgsignal, 'up') # получение R-пиков
-    R_Peaks_test.append(rpeaks)
+        ecgsignal_split = get_cycle(ecgsignal, rpeaks) # получение циклов экг
+        encoding_ecg = encoding(ecgsignal_split)  # кодирование циклов
 
-    ecgsignal_split = get_cycle(ecgsignal, rpeaks) # получение циклов экг
-    encoding_ecg = encoding(ecgsignal_split)  # кодирование циклов
-
-    ecg_ids_test.append(ecg_id)
-    encoding_ecgs_test.append(encoding_ecg)
-encoding_ecg_test = pd.DataFrame(columns=['encoding_ecg', 'ecg_id'])
-encoding_ecg_test.encoding_ecg = encoding_ecgs_test
-encoding_ecg_test.ecg_id = ecg_ids_test
-ngramms_ecgs_test = []  # список н-грамм в кардиограммах
-for ecg in array(encoding_ecg_test):
-    ngramms_ecg_test = set()
-    n = list(map(lambda x: ''.join(list(x)), list(ngrams(list(ecg[0]), 4))))
-    for k in n:
-        ngramms_ecg_test.add(k)
-    ngramms_ecgs_test.append(list(ngramms_ecg_test))
-df_healthy = pd.DataFrame([func(ng)[0] for ng in ngramms_ecgs_test])
-df_septal = pd.DataFrame([func(ng)[1] for ng in ngramms_ecgs_test])
-df_front = pd.DataFrame([func(ng)[2] for ng in ngramms_ecgs_test])
-df_side = pd.DataFrame([func(ng)[3] for ng in ngramms_ecgs_test])
-df_front_side = pd.DataFrame([func(ng)[4] for ng in ngramms_ecgs_test])
-df_front_septal = pd.DataFrame([func(ng)[5] for ng in ngramms_ecgs_test])
-df_lower = pd.DataFrame([func(ng)[6] for ng in ngramms_ecgs_test])
-answer = pd.DataFrame(columns=['перегородочный', 'передний', 'боковой', 'передне-боковой', 'передне-перегородочный',
+         ecg_ids_test.append(ecg_id)
+        encoding_ecgs_test.append(encoding_ecg)
+    encoding_ecg_test = pd.DataFrame(columns=['encoding_ecg', 'ecg_id'])
+    encoding_ecg_test.encoding_ecg = encoding_ecgs_test
+    encoding_ecg_test.ecg_id = ecg_ids_test
+    ngramms_ecgs_test = []  # список н-грамм в кардиограммах
+    for ecg in array(encoding_ecg_test):
+        ngramms_ecg_test = set()
+        n = list(map(lambda x: ''.join(list(x)), list(ngrams(list(ecg[0]), 4))))
+        for k in n:
+            ngramms_ecg_test.add(k)
+        ngramms_ecgs_test.append(list(ngramms_ecg_test))
+    df_healthy = pd.DataFrame([func(ng)[0] for ng in ngramms_ecgs_test])
+    df_septal = pd.DataFrame([func(ng)[1] for ng in ngramms_ecgs_test])
+    df_front = pd.DataFrame([func(ng)[2] for ng in ngramms_ecgs_test])
+    df_side = pd.DataFrame([func(ng)[3] for ng in ngramms_ecgs_test])
+    df_front_side = pd.DataFrame([func(ng)[4] for ng in ngramms_ecgs_test])
+    df_front_septal = pd.DataFrame([func(ng)[5] for ng in ngramms_ecgs_test])
+    df_lower = pd.DataFrame([func(ng)[6] for ng in ngramms_ecgs_test])
+    answer = pd.DataFrame(columns=['перегородочный', 'передний', 'боковой', 'передне-боковой', 'передне-перегородочный',
                               'нижний', 'норма', 'record_name'])
-answer['record_name'] = list(map(lambda x: x[:-4], os.listdir('test')[:-1]))
-answer['норма'] = cat_n_gramms_healthy.predict(df_healthy)
-answer['перегородочный'] = cat_n_gramms_septal.predict(df_septal)
-answer['передний'] = cat_n_gramms_front.predict(df_front)
-answer['боковой'] = cat_n_gramms_side.predict(df_side)
-answer['передне-боковой'] = cat_n_gramms_front_side.predict(df_front_side)
-answer['передне-перегородочный'] = cat_n_gramms_front_septal.predict(df_front_septal)
-answer['нижний'] = cat_n_gramms_lower.predict(df_lower)
-target = pd.Series(list(map(lambda x: x[:-4], os.listdir('test')[:-1])))
-ECG_data_test = into_one_table(target, 'test/') # таблица с графиками
-ECG_data_test[0] = ECG_data_test[0].astype('int')
-ECG_data_test = ECG_data_test.rename(columns={0: 'ecg_id'})
-ECG_data_test = ECG_data_test.sort_values(by=['ecg_id'], ascending=True)
-
-df_test = pd.read_csv('test/test_meta.csv')
-df_test.record_name = list(map(lambda x: int(x.strip('_hr')), df_test.record_name))
-df_test.rename(columns = {'record_name':'ecg_id'}, inplace = True)
-ECG_data_test = ECG_data_test.merge(df_test, on='ecg_id', how='left')
-df_test = ECG_data_test.iloc[:, -5:]
-ECG_data_test = ECG_data_test.iloc[:, :-5]
-
-ECG_data_test_array = np.array(ECG_data_test)
-R_Peaks_test = []
-ecg_ids_test = []
-encoding_ecgs_test = []
-for ecgsignal in ECG_data_test_array: # кодирование таблицы  с графиками
-    ecg_id = ecgsignal[0]
-    ecgsignal = ecgsignal[1:]
-
-    _, results = neurokit2.ecg_peaks(ecgsignal, sampling_rate=100)
-    rpeaks = results["ECG_R_Peaks"]
-    rpeaks = sleepecg.detect_heartbeats(ecgsignal, fs=100)
-    rpeaks = wfdb.processing.xqrs_detect(ecgsignal, fs=100, verbose=False)
-
-    rpeaks = find_peaks(ecgsignal, 'up') # получение R-пиков
-    R_Peaks_test.append(rpeaks)
-
-    ecgsignal_split = get_cycle(ecgsignal, rpeaks) # получение циклов экг
-    encoding_ecg = encoding(ecgsignal_split)  # кодирование циклов
-
-    ecg_ids_test.append(ecg_id)
-    encoding_ecgs_test.append(encoding_ecg)
-encoding_ecg_test = pd.DataFrame(columns=['encoding_ecg', 'ecg_id'])
-encoding_ecg_test.encoding_ecg = encoding_ecgs_test
-encoding_ecg_test.ecg_id = ecg_ids_test
-
-ngramms_ecgs_test = []  # список н-грамм в кардиограммах
-for ecg in array(encoding_ecg_test):
-    ngramms_ecg_test = set()
-    n = list(map(lambda x: ''.join(list(x)), list(ngrams(list(ecg[0]), 4))))
-    for k in n:
-        ngramms_ecg_test.add(k)
-    ngramms_ecgs_test.append(list(ngramms_ecg_test))
-df_healthy = pd.DataFrame([func(ng)[0] for ng in ngramms_ecgs_test])
-df_septal = pd.DataFrame([func(ng)[1] for ng in ngramms_ecgs_test])
-df_front = pd.DataFrame([func(ng)[2] for ng in ngramms_ecgs_test])
-df_side = pd.DataFrame([func(ng)[3] for ng in ngramms_ecgs_test])
-df_front_side = pd.DataFrame([func(ng)[4] for ng in ngramms_ecgs_test])
-df_front_septal = pd.DataFrame([func(ng)[5] for ng in ngramms_ecgs_test])
-df_lower = pd.DataFrame([func(ng)[6] for ng in ngramms_ecgs_test])
-answer = pd.DataFrame(columns=['перегородочный', 'передний', 'боковой', 'передне-боковой', 'передне-перегородочный',
-                              'нижний', 'норма', 'record_name'])
-answer['record_name'] = list(map(lambda x: x[:-4], os.listdir('test')[:-1]))
-answer['норма'] = cat_n_gramms_healthy.predict(df_healthy)
-answer['перегородочный'] = cat_n_gramms_septal.predict(df_septal)
-answer['передний'] = cat_n_gramms_front.predict(df_front)
-answer['боковой'] = cat_n_gramms_side.predict(df_side)
-answer['передне-боковой'] = cat_n_gramms_front_side.predict(df_front_side)
-answer['передне-перегородочный'] = cat_n_gramms_front_septal.predict(df_front_septal)
-answer['нижний'] = cat_n_gramms_lower.predict(df_lower)
+    answer['record_name'] = list(map(lambda x: x[:-4], os.listdir('test')[:-1]))
+    answer['норма'] = cat_n_gramms_healthy.predict(df_healthy)
+    answer['перегородочный'] = cat_n_gramms_septal.predict(df_septal)
+    answer['передний'] = cat_n_gramms_front.predict(df_front)
+    answer['боковой'] = cat_n_gramms_side.predict(df_side)
+    answer['передне-боковой'] = cat_n_gramms_front_side.predict(df_front_side)
+    answer['передне-перегородочный'] = cat_n_gramms_front_septal.predict(df_front_septal)
+    answer['нижний'] = cat_n_gramms_lower.predict(df_lower)
